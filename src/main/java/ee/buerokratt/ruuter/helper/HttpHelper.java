@@ -1,6 +1,9 @@
 package ee.buerokratt.ruuter.helper;
 
 import io.netty.channel.ChannelOption;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.netty.http.client.HttpClient;
 
+import javax.net.ssl.SSLException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -70,8 +74,20 @@ public class HttpHelper {
         return HttpClient.create()
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
             .responseTimeout(Duration.ofMillis(10000))
+            .secure((sslContextSpec) -> sslContextSpec.sslContext(webClientSslContext()))
             .doOnConnected(conn ->
                 conn.addHandlerLast(new ReadTimeoutHandler(10000, TimeUnit.MILLISECONDS))
                     .addHandlerLast(new WriteTimeoutHandler(10000, TimeUnit.MILLISECONDS)));
+    }
+
+    SslContext webClientSslContext() {
+        try {
+            return SslContextBuilder
+                .forClient()
+                .trustManager(InsecureTrustManagerFactory.INSTANCE) // replace this once certs kick in
+                .build();
+        } catch (SSLException e) {
+            throw new IllegalStateException("Cannot create ssl context");
+        }
     }
 }
